@@ -2,17 +2,17 @@
 
 ## 1. Repository & Environment Audit
 
-### 1.1 Existing Workspace Inventory
-Inspection of `/app/applet` reveals a **clean starter template** rather than an existing VNex Solar multi-platform codebase:
+### 1.1 Existing Workspace & GitHub Repository Inventory
+Inspection of both `/app/applet` and the upstream GitHub repository `https://github.com/ndsolotravel/VNex-Solar` (branch `main`, HEAD `74ac331`, parent `49659a4`) confirms this is a **greenfield starter project** with no legacy production modules or BaaS lock-in:
 
 | Item | Current State | Notes |
 | --- | --- | --- |
-| Git Repository | Not initialized (`.git` absent) | No prior commits or branch history |
+| Git Repository | `ndsolotravel/VNex-Solar` (`main` @ `74ac331`) | Two commits: `49659a4` (Initial README) and `74ac331` (starter React/Vite scaffold + Phase 0 doc); no `.git` folder inside `/app/applet` sandbox |
 | Android App (Kotlin / Compose / Room) | Not present | No `settings.gradle.kts`, `build.gradle.kts`, or Kotlin sources |
 | Web Admin (Next.js App Router) | Not present | Current web entry is a blank React 19 + Vite 8 SPA (`src/App.tsx`) |
 | Backend API (NestJS) | Not present | Express `^4.21.2` and `tsx` are installed in `package.json`, no `server.ts` yet |
 | Database / ORM | Not present | No PostgreSQL instance, Prisma/Drizzle config, or migrations |
-| Supabase / Firebase Dependencies | None detected | Zero BaaS packages in `package.json` |
+| Supabase / Firebase Dependencies | None detected | Zero BaaS packages, auth hooks, or storage clients in any commit |
 | Existing Tests | None present | Only `npm run lint` (`tsc --noEmit`) and `npm run build` (`vite build`) |
 | Security Findings | No secrets exposed | `.env.example` holds placeholder vars; `.gitignore` excludes `.env*` |
 
