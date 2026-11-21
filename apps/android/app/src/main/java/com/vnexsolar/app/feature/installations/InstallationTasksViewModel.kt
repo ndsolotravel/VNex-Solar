@@ -3,6 +3,8 @@ package com.vnexsolar.app.feature.installations
 import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.vnexsolar.app.core.preferences.AppPreferences
+import com.vnexsolar.app.core.security.SessionVault
 import com.vnexsolar.app.core.sync.NetworkMonitor
 import com.vnexsolar.app.core.sync.OfflineRepository
 import com.vnexsolar.app.core.sync.SyncWorker
@@ -92,6 +94,8 @@ data class InstallationTasksUiState(
 class InstallationTasksViewModel @Inject constructor(
     @ApplicationContext private val appContext: Context,
     private val offlineRepository: OfflineRepository,
+    private val sessionVault: SessionVault,
+    private val appPreferences: AppPreferences,
     networkMonitor: NetworkMonitor,
 ) : ViewModel() {
 
@@ -109,6 +113,20 @@ class InstallationTasksViewModel @Inject constructor(
         _uiState.update { it.copy(workSummary = value) }
     }
 
+    private suspend fun resolveSessionIds(organizationId: String, deviceId: String): Pair<String, String> {
+        val resolvedOrg = if (organizationId == "local-org" || organizationId.isBlank()) {
+            sessionVault.currentSession?.organizationId ?: organizationId
+        } else {
+            organizationId
+        }
+        val resolvedDevice = if (deviceId == "android-field-device" || deviceId.isBlank()) {
+            runCatching { appPreferences.getOrCreateDeviceId() }.getOrElse { deviceId }
+        } else {
+            deviceId
+        }
+        return resolvedOrg to resolvedDevice
+    }
+
     fun advanceTaskStatusOffline(
         organizationId: String,
         deviceId: String,
@@ -124,15 +142,16 @@ class InstallationTasksViewModel @Inject constructor(
         )
 
         viewModelScope.launch {
+            val (resolvedOrg, resolvedDevice) = resolveSessionIds(organizationId, deviceId)
             offlineRepository.enqueueEntityOutboxMutation(
-                organizationId = organizationId,
+                organizationId = resolvedOrg,
                 entityType = "installation_task",
                 entityId = target.id,
                 operationType = "update",
                 baseRowVersion = target.rowVersion,
                 payloadJson = Json.encodeToString(payload),
             )
-            SyncWorker.enqueueOneTime(appContext, organizationId, deviceId)
+            SyncWorker.enqueueOneTime(appContext, resolvedOrg, resolvedDevice)
             _uiState.update { state ->
                 state.copy(
                     tasks = state.tasks.map { item ->
@@ -165,15 +184,16 @@ class InstallationTasksViewModel @Inject constructor(
         )
 
         viewModelScope.launch {
+            val (resolvedOrg, resolvedDevice) = resolveSessionIds(organizationId, deviceId)
             offlineRepository.enqueueEntityOutboxMutation(
-                organizationId = organizationId,
+                organizationId = resolvedOrg,
                 entityType = "installation_task",
                 entityId = logId,
                 operationType = "create",
                 baseRowVersion = 0,
                 payloadJson = Json.encodeToString(payload),
             )
-            SyncWorker.enqueueOneTime(appContext, organizationId, deviceId)
+            SyncWorker.enqueueOneTime(appContext, resolvedOrg, resolvedDevice)
             _uiState.update {
                 it.copy(
                     workSummary = "",
@@ -190,8 +210,9 @@ class InstallationTasksViewModel @Inject constructor(
     ) {
         val jobId = _uiState.value.jobId
         viewModelScope.launch {
+            val (resolvedOrg, _) = resolveSessionIds(organizationId, "android-field-device")
             offlineRepository.enqueueMediaAttachment(
-                organizationId = organizationId,
+                organizationId = resolvedOrg,
                 entityType = "installation_job",
                 entityId = jobId,
                 localFilePath = localFilePath,

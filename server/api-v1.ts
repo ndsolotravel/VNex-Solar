@@ -7,6 +7,7 @@ import { VNEX_OPENAPI_SPEC } from '../apps/api/src/openapi/openapi-spec.ts';
 import {
   UserRole,
   calculateSolarDesignEngineering,
+  hasPermission,
 } from '../packages/domain/src/index.ts';
 import {
   AuthServiceError,
@@ -34,7 +35,7 @@ const registerOrgSchema = z.object({
   slug: z.string().min(2).max(100).regex(/^[a-z0-9-]+$/),
   businessAddress: z.string().min(4).max(400),
   countryCode: z.string().length(2).default('PK'),
-  defaultCurrency: z.enum(['PKR', 'USD', 'AED', 'EUR', 'GBP']).default('PKR'),
+  defaultCurrency: z.enum(['PKR', 'USD', 'AED', 'SAR', 'EUR', 'GBP']).default('PKR'),
   ownerFullName: z.string().min(2).max(160),
   ownerEmail: z.string().email(),
   password: z.string().min(10).max(128),
@@ -62,7 +63,7 @@ const inviteMemberSchema = z.object({
 const updateOrgSchema = z.object({
   displayName: z.string().min(2).max(200).optional(),
   businessAddress: z.string().min(4).max(400).optional(),
-  defaultCurrency: z.enum(['PKR', 'USD', 'AED', 'EUR', 'GBP']).optional(),
+  defaultCurrency: z.enum(['PKR', 'USD', 'AED', 'SAR', 'EUR', 'GBP']).optional(),
   taxRegistrationNumber: z.string().max(100).nullable().optional(),
 });
 
@@ -168,7 +169,7 @@ const createFullProjectSchema = z.object({
   title: z.string().min(2).max(200),
   systemType: z.enum(['on_grid', 'hybrid', 'off_grid']).default('hybrid'),
   targetCapacityKwp: z.number().positive().nullable().optional(),
-  currency: z.enum(['PKR', 'USD', 'AED', 'EUR', 'GBP']).default('PKR'),
+  currency: z.enum(['PKR', 'USD', 'AED', 'SAR', 'EUR', 'GBP']).default('PKR'),
   assignedUserIds: z.array(z.string().uuid()).optional(),
 });
 
@@ -280,7 +281,7 @@ const batterySpecSchema = z.object({
 });
 
 const solarDesignCalcInputSchema = z.object({
-  currency: z.enum(['PKR', 'USD', 'AED', 'EUR', 'GBP']).default('PKR'),
+  currency: z.enum(['PKR', 'USD', 'AED', 'SAR', 'EUR', 'GBP']).default('PKR'),
   loadProfiles: z.array(loadProfileItemSchema).optional(),
   overrideDailyEnergyKwh: z.number().positive().optional(),
   overridePeakPowerKw: z.number().positive().optional(),
@@ -376,7 +377,7 @@ const createCatalogItemSchema = z.object({
   unitOfMeasure: z.string().min(1).max(24).default('pcs'),
   unitCostMinor: z.number().int().min(0),
   unitSellPriceMinor: z.number().int().min(0),
-  currency: z.enum(['PKR', 'USD', 'AED', 'EUR', 'GBP']).default('PKR'),
+  currency: z.enum(['PKR', 'USD', 'AED', 'SAR', 'EUR', 'GBP']).default('PKR'),
   warrantyMonths: z.number().int().min(0).default(12),
   reorderLevel: z.number().min(0).default(5),
   isSerialized: z.boolean().default(true),
@@ -385,7 +386,7 @@ const createCatalogItemSchema = z.object({
 const createPurchaseOrderSchema = z.object({
   supplierId: z.string().uuid(),
   warehouseId: z.string().uuid(),
-  currency: z.enum(['PKR', 'USD', 'AED', 'EUR', 'GBP']).default('PKR'),
+  currency: z.enum(['PKR', 'USD', 'AED', 'SAR', 'EUR', 'GBP']).default('PKR'),
   items: z
     .array(
       z.object({
@@ -458,7 +459,7 @@ const createQuotationSchema = z.object({
   projectId: z.string().uuid(),
   designRevisionId: z.string().uuid().nullable().optional(),
   title: z.string().min(2).max(200),
-  currency: z.enum(['PKR', 'USD', 'AED', 'EUR', 'GBP']).optional(),
+  currency: z.enum(['PKR', 'USD', 'AED', 'SAR', 'EUR', 'GBP']).optional(),
   validityDays: z.number().int().min(1).max(365).optional(),
   termsAndConditions: z.string().max(4000).optional(),
   notes: z.string().max(2000).optional(),
@@ -503,7 +504,7 @@ const createInvoiceSchema = z.object({
   quotationRevisionId: z.string().uuid().nullable().optional(),
   invoiceType: z.enum(['advance', 'progress', 'final']),
   dueDate: z.string().min(8).max(32),
-  currency: z.enum(['PKR', 'USD', 'AED', 'EUR', 'GBP']).optional(),
+  currency: z.enum(['PKR', 'USD', 'AED', 'SAR', 'EUR', 'GBP']).optional(),
   items: z
     .array(
       z.object({
@@ -520,8 +521,8 @@ const createInvoiceSchema = z.object({
 const recordPaymentSchema = z.object({
   idempotencyKey: z.string().min(4).max(128),
   customerId: z.string().uuid(),
-  paymentMethod: z.enum(['bank_transfer', 'cash', 'cheque', 'card', 'online']),
-  currency: z.enum(['PKR', 'USD', 'AED', 'EUR', 'GBP']).default('PKR'),
+  paymentMethod: z.enum(['bank_transfer', 'cash', 'jazzcash', 'easypaisa', 'cheque', 'card', 'online']),
+  currency: z.enum(['PKR', 'USD', 'AED', 'SAR', 'EUR', 'GBP']).default('PKR'),
   amountMinor: z.number().int().positive(),
   referenceNo: z.string().max(120).nullable().optional(),
   allocations: z
@@ -541,7 +542,7 @@ const issueCreditNoteSchema = z.object({
 });
 
 const manualJournalSchema = z.object({
-  currency: z.enum(['PKR', 'USD', 'AED', 'EUR', 'GBP']).default('PKR'),
+  currency: z.enum(['PKR', 'USD', 'AED', 'SAR', 'EUR', 'GBP']).default('PKR'),
   description: z.string().min(3).max(300),
   referenceId: z.string().uuid().optional(),
   lines: z
@@ -3395,6 +3396,148 @@ export function createApiV1Router(options?: {
       return res.json(
         syncService.verifyMediaUpload(claims, String(req.params.id), parsed.data.actualSha256),
       );
+    } catch (err) {
+      return handleError(res, err);
+    }
+  });
+
+  router.get('/dashboard/summary', async (req: Request, res: Response) => {
+    try {
+      const claims = await requireAuth(req, res);
+      if (!claims) return;
+
+      const rangeRaw = typeof req.query.range === 'string' ? req.query.range : '30d';
+      const range = ['7d', '30d', '90d', 'ytd', 'all'].includes(rangeRaw) ? rangeRaw : '30d';
+      const now = new Date();
+      const windowStartMs = (() => {
+        if (range === '7d') return now.getTime() - 7 * 86_400_000;
+        if (range === '30d') return now.getTime() - 30 * 86_400_000;
+        if (range === '90d') return now.getTime() - 90 * 86_400_000;
+        if (range === 'ytd') return new Date(Date.UTC(now.getUTCFullYear(), 0, 1)).getTime();
+        return 0;
+      })();
+      const inRange = (iso?: string | null) => {
+        if (range === 'all' || !iso) return true;
+        const ms = Date.parse(iso);
+        return Number.isFinite(ms) ? ms >= windowStartMs : true;
+      };
+
+      const org = authService.getCurrentOrganization(claims);
+      const canReadFinance = hasPermission(claims.role, 'finance:read');
+      const canReadInventory = hasPermission(claims.role, 'inventory:read');
+      const canReadQuotations = hasPermission(claims.role, 'quotations:read');
+      const canReadSurveys = hasPermission(claims.role, 'surveys:read');
+
+      const projects = hasPermission(claims.role, 'customers:read')
+        ? customersSurveysService.listProjects(claims)
+        : [];
+      const jobs = hasPermission(claims.role, 'installation:read')
+        ? installationService.listJobs(claims)
+        : [];
+      const quotations = canReadQuotations
+        ? quotationsBillingService.listQuotations(claims)
+        : [];
+      const surveys = canReadSurveys
+        ? customersSurveysService.listSurveys(claims)
+        : [];
+      const tickets = hasPermission(claims.role, 'maintenance:read')
+        ? maintenanceService.listTickets(claims)
+        : [];
+
+      const activeInstallations = jobs.filter(
+        (j) => j.status === 'scheduled' || j.status === 'in_progress',
+      ).length;
+      const completedInstallations = jobs.filter((j) => j.status === 'completed').length;
+      const pendingQuotations = quotations.filter(
+        (q) => q.quotation.status === 'draft' || q.quotation.status === 'sent',
+      ).length;
+      const upcomingSiteVisits =
+        surveys.filter((s) => s.surveyStatus === 'draft').length +
+        jobs.filter((j) => j.status === 'scheduled').length;
+      const pendingMaintenance = tickets.filter(
+        (t) => t.status !== 'resolved' && t.status !== 'closed',
+      ).length;
+
+      const invoices = canReadFinance
+        ? quotationsBillingService
+            .listInvoices(claims)
+            .filter((inv) => inv.status !== 'void' && inv.status !== 'draft')
+        : [];
+      const payments = canReadFinance ? quotationsBillingService.listPayments(claims) : [];
+      const movements = canReadInventory ? inventoryService.listMovements(claims) : [];
+      const balances = canReadInventory ? inventoryService.listBalances(claims).balances : [];
+
+      const totalSalesMinor = invoices
+        .filter((inv) => inRange(inv.issuedAt ?? inv.createdAt))
+        .reduce((acc, inv) => acc + inv.totalAmountMinor, 0);
+      const outstandingPaymentsMinor = invoices.reduce(
+        (acc, inv) => acc + inv.balanceDueMinor,
+        0,
+      );
+      const inventoryValueMinor = balances.reduce(
+        (acc, b) => acc + Math.round(b.onHandQty * b.unitCostMinor),
+        0,
+      );
+      const monthlyRevenueMinor = payments
+        .filter((p) => inRange(p.receivedAt))
+        .reduce((acc, p) => acc + p.amountMinor, 0);
+      const monthlyExpensesMinor = movements
+        .filter((m) => m.movementType === 'goods_receipt' && inRange(m.createdAt))
+        .reduce((acc, m) => acc + Math.round(Math.abs(m.quantityDelta) * m.unitCostMinor), 0);
+      const netProfitMinor = monthlyRevenueMinor - monthlyExpensesMinor;
+
+      const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      const monthlySeries: Array<{
+        monthKey: string;
+        monthLabel: string;
+        revenueMinor: number;
+        expensesMinor: number;
+      }> = [];
+
+      for (let offset = 5; offset >= 0; offset -= 1) {
+        const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - offset, 1));
+        const year = d.getUTCFullYear();
+        const month = d.getUTCMonth();
+        const monthKey = `${year}-${String(month + 1).padStart(2, '0')}`;
+        const monthLabel = monthNames[month];
+
+        const rev = payments
+          .filter((p) => p.receivedAt.startsWith(monthKey))
+          .reduce((acc, p) => acc + p.amountMinor, 0);
+        const exp = movements
+          .filter((m) => m.movementType === 'goods_receipt' && m.createdAt.startsWith(monthKey))
+          .reduce((acc, m) => acc + Math.round(Math.abs(m.quantityDelta) * m.unitCostMinor), 0);
+
+        monthlySeries.push({
+          monthKey,
+          monthLabel,
+          revenueMinor: rev,
+          expensesMinor: exp,
+        });
+      }
+
+      return res.json({
+        range,
+        currency: org.defaultCurrency,
+        financialAccess: canReadFinance,
+        inventoryAccess: canReadInventory,
+        kpis: {
+          totalProjects: projects.length,
+          activeInstallations,
+          completedInstallations,
+          pendingQuotations,
+          totalSalesMinor,
+          outstandingPaymentsMinor,
+          inventoryValueMinor,
+          monthlyRevenueMinor,
+          monthlyExpensesMinor,
+          netProfitMinor,
+          upcomingSiteVisits,
+          pendingMaintenance,
+        },
+        monthlySeries,
+        generatedAt: now.toISOString(),
+      });
     } catch (err) {
       return handleError(res, err);
     }

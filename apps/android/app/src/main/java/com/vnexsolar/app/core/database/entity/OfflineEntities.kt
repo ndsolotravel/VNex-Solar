@@ -127,3 +127,89 @@ data class SyncCheckpointEntity(
     val lastServerSeq: Long = 0L,
     val lastSyncCompletedAtEpochMs: Long = 0L,
 )
+
+@Entity(
+    tableName = "projects",
+    indices = [Index(value = ["organizationId", "updatedAtEpochMs"])],
+)
+data class ProjectEntity(
+    @PrimaryKey val id: String,
+    val organizationId: String,
+    val customerId: String,
+    val siteId: String,
+    val projectCode: String,
+    val title: String,
+    val systemType: String,
+    val targetCapacityKwp: Double?,
+    val currentStage: String,
+    val status: String,
+    val currency: String,
+    val rowVersion: Int = 1,
+    val syncState: String = "SYNCED",
+    val updatedAtEpochMs: Long,
+)
+
+@Entity(
+    tableName = "sites",
+    indices = [Index(value = ["organizationId", "customerId"])],
+)
+data class SiteEntity(
+    @PrimaryKey val id: String,
+    val organizationId: String,
+    val customerId: String,
+    val siteName: String,
+    val addressLine: String,
+    val city: String,
+    val countryCode: String = "PK",
+    val utilityProvider: String?,
+    val meterReference: String?,
+    val connectionPhase: String = "three",
+    val rowVersion: Int = 1,
+    val syncState: String = "SYNCED",
+    val createdAtEpochMs: Long,
+)
+
+@Entity(tableName = "dashboard_snapshots")
+data class DashboardSnapshotEntity(
+    @PrimaryKey val snapshotKey: String, // "$organizationId:$range"
+    val organizationId: String,
+    val rangeKey: String,
+    val payloadJson: String,
+    val updatedAtEpochMs: Long,
+)
+
+@Entity(
+    tableName = "draft_expenses",
+    indices = [Index(value = ["organizationId", "createdAtEpochMs"])],
+)
+data class DraftExpenseEntity(
+    @PrimaryKey val id: String,
+    val organizationId: String,
+    val category: String, // site_expense | supplier_payment | transport | labor | utility
+    val description: String,
+    val amountMinor: Long,
+    val currency: String,
+    val paymentMethod: String, // cash | bank_transfer | jazzcash | easypaisa | cheque
+    val referenceNo: String?,
+    val status: String = "DRAFT", // DRAFT | POSTED
+    val createdAtEpochMs: Long,
+)
+
+@Entity(
+    tableName = "cached_quotations",
+    indices = [Index(value = ["organizationId", "updatedAtEpochMs"])],
+)
+data class CachedQuotationEntity(
+    @PrimaryKey val id: String,
+    val organizationId: String,
+    val projectId: String,
+    val customerId: String,
+    val quotationNumber: String,
+    val title: String,
+    val status: String,
+    val currentRevisionNumber: Int,
+    val currency: String,
+    val totalAmountMinor: Long,
+    val payloadJson: String,
+    val updatedAtEpochMs: Long,
+)

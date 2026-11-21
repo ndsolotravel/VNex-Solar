@@ -5,7 +5,14 @@ export type QuotationStatus = 'draft' | 'sent' | 'approved' | 'rejected' | 'expi
 
 export type InvoiceType = 'advance' | 'progress' | 'final';
 export type InvoiceStatus = 'draft' | 'issued' | 'partially_paid' | 'paid' | 'void';
-export type PaymentMethod = 'bank_transfer' | 'cash' | 'cheque' | 'card' | 'online';
+export type PaymentMethod =
+  | 'bank_transfer'
+  | 'cash'
+  | 'jazzcash'
+  | 'easypaisa'
+  | 'cheque'
+  | 'card'
+  | 'online';
 
 export interface QuotationLineItemInput {
   id?: string;

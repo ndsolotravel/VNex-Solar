@@ -3,8 +3,13 @@ package com.vnexsolar.app.core.sync
 import androidx.room.withTransaction
 import com.vnexsolar.app.core.database.VNexDatabase
 import com.vnexsolar.app.core.database.entity.CachedEquipmentEntity
+import com.vnexsolar.app.core.database.entity.CachedQuotationEntity
 import com.vnexsolar.app.core.database.entity.CustomerEntity
+import com.vnexsolar.app.core.database.entity.DashboardSnapshotEntity
+import com.vnexsolar.app.core.database.entity.DraftExpenseEntity
 import com.vnexsolar.app.core.database.entity.MediaUploadQueueEntity
+import com.vnexsolar.app.core.database.entity.ProjectEntity
+import com.vnexsolar.app.core.database.entity.SiteEntity
 import com.vnexsolar.app.core.database.entity.SiteSurveyEntity
 import com.vnexsolar.app.core.database.entity.SyncOutboxEntity
 import java.util.UUID
@@ -19,6 +24,56 @@ class OfflineRepository @Inject constructor(
     fun observeCustomers(organizationId: String): Flow<List<CustomerEntity>> =
         database.customerDao().observeAll(organizationId)
 
+    suspend fun cacheCustomers(items: List<CustomerEntity>) {
+        if (items.isNotEmpty()) {
+            database.customerDao().upsertAll(items)
+        }
+    }
+
+    fun observeProjects(organizationId: String): Flow<List<ProjectEntity>> =
+        database.projectDao().observeAll(organizationId)
+
+    suspend fun cacheProjects(items: List<ProjectEntity>) {
+        if (items.isNotEmpty()) {
+            database.projectDao().upsertAll(items)
+        }
+    }
+
+    suspend fun upsertProject(project: ProjectEntity) {
+        database.projectDao().upsert(project)
+    }
+
+    fun observeAllSites(organizationId: String): Flow<List<SiteEntity>> =
+        database.siteDao().observeAll(organizationId)
+
+    fun observeSitesForCustomer(organizationId: String, customerId: String): Flow<List<SiteEntity>> =
+        database.siteDao().observeForCustomer(organizationId, customerId)
+
+    suspend fun cacheSites(items: List<SiteEntity>) {
+        if (items.isNotEmpty()) {
+            database.siteDao().upsertAll(items)
+        }
+    }
+
+    suspend fun upsertSite(site: SiteEntity) {
+        database.siteDao().upsert(site)
+    }
+
+    suspend fun getDashboardSnapshot(organizationId: String, rangeKey: String): DashboardSnapshotEntity? =
+        database.dashboardSnapshotDao().getSnapshot("$organizationId:$rangeKey")
+
+    suspend fun saveDashboardSnapshot(organizationId: String, rangeKey: String, payloadJson: String) {
+        database.dashboardSnapshotDao().upsert(
+            DashboardSnapshotEntity(
+                snapshotKey = "$organizationId:$rangeKey",
+                organizationId = organizationId,
+                rangeKey = rangeKey,
+                payloadJson = payloadJson,
+                updatedAtEpochMs = System.currentTimeMillis(),
+            ),
+        )
+    }
+
     fun observeEquipmentCatalog(organizationId: String): Flow<List<CachedEquipmentEntity>> =
         database.cachedEquipmentDao().observeCatalog(organizationId)
 
@@ -26,8 +81,51 @@ class OfflineRepository @Inject constructor(
         database.cachedEquipmentDao().upsertAll(items)
     }
 
+    fun observeDraftExpenses(organizationId: String): Flow<List<DraftExpenseEntity>> =
+        database.draftExpenseDao().observeAll(organizationId)
+
+    suspend fun upsertDraftExpense(expense: DraftExpenseEntity) {
+        database.draftExpenseDao().upsert(expense)
+    }
+
+    suspend fun markDraftExpensePosted(organizationId: String, id: String) {
+        database.draftExpenseDao().updateStatus(organizationId, id, "POSTED")
+    }
+
+    suspend fun deleteDraftExpense(organizationId: String, id: String) {
+        database.draftExpenseDao().deleteById(organizationId, id)
+    }
+
+    fun observeCachedQuotations(organizationId: String): Flow<List<CachedQuotationEntity>> =
+        database.cachedQuotationDao().observeAll(organizationId)
+
+    suspend fun cacheQuotations(items: List<CachedQuotationEntity>) {
+        if (items.isNotEmpty()) {
+            database.cachedQuotationDao().upsertAll(items)
+        }
+    }
+
     fun observePendingOutboxCount(organizationId: String): Flow<Int> =
         database.syncOutboxDao().observePendingCount(organizationId)
+
+    fun observeAllOutbox(organizationId: String): Flow<List<SyncOutboxEntity>> =
+        database.syncOutboxDao().observeAll(organizationId)
+
+    fun observePendingConflicts(organizationId: String) =
+        database.syncConflictDao().observePendingConflicts(organizationId)
+
+    fun observeMediaQueue(organizationId: String): Flow<List<MediaUploadQueueEntity>> =
+        database.mediaUploadQueueDao().observeAll(organizationId)
+
+    fun observeSyncCheckpoint(organizationId: String) =
+        database.syncCheckpointDao().observeCheckpoint("$organizationId:delta")
+
+    suspend fun retryOutboxOperationNow(operationId: String) {
+        database.syncOutboxDao().resetRetryNow(operationId)
+    }
+
+    suspend fun clearAppliedOutbox(organizationId: String): Int =
+        database.syncOutboxDao().deleteApplied(organizationId)
 
     /**
      * Atomically writes the local customer entity and enqueues its outbox mutation

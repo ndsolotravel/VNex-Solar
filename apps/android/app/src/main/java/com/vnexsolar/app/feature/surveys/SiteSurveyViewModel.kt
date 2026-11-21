@@ -4,6 +4,8 @@ import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.vnexsolar.app.core.database.entity.SiteSurveyEntity
+import com.vnexsolar.app.core.preferences.AppPreferences
+import com.vnexsolar.app.core.security.SessionVault
 import com.vnexsolar.app.core.sync.NetworkMonitor
 import com.vnexsolar.app.core.sync.OfflineRepository
 import com.vnexsolar.app.core.sync.SyncWorker
@@ -50,6 +52,8 @@ data class SurveyPayloadJson(
     val ambientMaxTempC: Double,
     val earthingAvailable: Boolean,
     val notes: String,
+    val latitude: Double? = null,
+    val longitude: Double? = null,
     val roofSections: List<RoofSectionDraft>,
     val loadProfiles: List<LoadItemDraft>,
 )
@@ -62,6 +66,9 @@ data class SurveyUiState(
     val ambientMaxTempC: String = "47",
     val earthingAvailable: Boolean = true,
     val notes: String = "",
+    val latitude: String = "",
+    val longitude: String = "",
+    val gpsStatusLabel: String? = null,
     val roofSections: List<RoofSectionDraft> = emptyList(),
     val loadItems: List<LoadItemDraft> = emptyList(),
     val queuedPhotoCount: Int = 0,
@@ -72,6 +79,8 @@ data class SurveyUiState(
 class SiteSurveyViewModel @Inject constructor(
     @ApplicationContext private val appContext: Context,
     private val offlineRepository: OfflineRepository,
+    private val sessionVault: SessionVault,
+    private val appPreferences: AppPreferences,
     networkMonitor: NetworkMonitor,
 ) : ViewModel() {
 
@@ -97,15 +106,30 @@ class SiteSurveyViewModel @Inject constructor(
         _uiState.update { it.copy(earthingAvailable = available) }
     }
 
+    fun updateSiteCoordinates(lat: String, lng: String, label: String? = null) {
+        _uiState.update {
+            it.copy(
+                latitude = lat,
+                longitude = lng,
+                gpsStatusLabel = label ?: it.gpsStatusLabel,
+            )
+        }
+    }
+
     fun queueCapturedPhoto(
         organizationId: String,
         localFilePath: String,
         jpegBytes: ByteArray,
     ) {
         val currentSurveyId = _uiState.value.surveyId
+        val resolvedOrg = if (organizationId == "local-org" || organizationId.isBlank()) {
+            sessionVault.currentSession?.organizationId ?: organizationId
+        } else {
+            organizationId
+        }
         viewModelScope.launch {
             offlineRepository.enqueueMediaAttachment(
-                organizationId = organizationId,
+                organizationId = resolvedOrg,
                 entityType = "site_survey",
                 entityId = currentSurveyId,
                 localFilePath = localFilePath,
@@ -124,22 +148,34 @@ class SiteSurveyViewModel @Inject constructor(
     fun saveSurveyOffline(organizationId: String, surveyorUserId: String, deviceId: String) {
         val state = _uiState.value
         val now = System.currentTimeMillis()
+        val resolvedOrg = if (organizationId == "local-org" || organizationId.isBlank()) {
+            sessionVault.currentSession?.organizationId ?: organizationId
+        } else {
+            organizationId
+        }
+        val resolvedUser = if (surveyorUserId == "local-user" || surveyorUserId.isBlank()) {
+            sessionVault.currentSession?.userId ?: surveyorUserId
+        } else {
+            surveyorUserId
+        }
         val payload = SurveyPayloadJson(
             projectId = state.projectId,
             ambientMinTempC = state.ambientMinTempC.toDoubleOrNull() ?: 5.0,
             ambientMaxTempC = state.ambientMaxTempC.toDoubleOrNull() ?: 46.0,
             earthingAvailable = state.earthingAvailable,
             notes = state.notes,
+            latitude = state.latitude.toDoubleOrNull(),
+            longitude = state.longitude.toDoubleOrNull(),
             roofSections = state.roofSections,
             loadProfiles = state.loadItems,
         )
 
         val entity = SiteSurveyEntity(
             id = state.surveyId,
-            organizationId = organizationId,
+            organizationId = resolvedOrg,
             projectId = state.projectId,
             siteId = state.siteId,
-            surveyorUserId = surveyorUserId,
+            surveyorUserId = resolvedUser,
             surveyStatus = "draft",
             ambientMinTempC = payload.ambientMinTempC,
             ambientMaxTempC = payload.ambientMaxTempC,
@@ -151,13 +187,18 @@ class SiteSurveyViewModel @Inject constructor(
         )
 
         viewModelScope.launch {
+            val resolvedDevice = if (deviceId == "android-field-device" || deviceId.isBlank()) {
+                runCatching { appPreferences.getOrCreateDeviceId() }.getOrElse { deviceId }
+            } else {
+                deviceId
+            }
             offlineRepository.saveSiteSurveyOffline(
-                organizationId = organizationId,
+                organizationId = resolvedOrg,
                 survey = entity,
                 operationType = "create",
                 payloadJson = Json.encodeToString(payload),
             )
-            SyncWorker.enqueueOneTime(appContext, organizationId, deviceId)
+            SyncWorker.enqueueOneTime(appContext, resolvedOrg, resolvedDevice)
             _uiState.update {
                 it.copy(lastSavedMessage = "Saved to Room SQLite & queued in sync outbox")
             }

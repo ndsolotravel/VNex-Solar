@@ -49,7 +49,7 @@ export const VNEX_DARK_TOKENS: VNexThemeTokens = {
   critical: '#EF4444',
 };
 
-export type SupportedCurrency = 'PKR' | 'USD' | 'AED' | 'EUR' | 'GBP';
+export type SupportedCurrency = 'PKR' | 'USD' | 'AED' | 'SAR' | 'EUR' | 'GBP';
 
 export const SUPPORTED_CURRENCIES: ReadonlyArray<{
   code: SupportedCurrency;
@@ -60,6 +60,7 @@ export const SUPPORTED_CURRENCIES: ReadonlyArray<{
   { code: 'PKR', symbol: 'Rs', label: 'Pakistani Rupee (PKR)', minorUnits: 2 },
   { code: 'USD', symbol: '$', label: 'US Dollar (USD)', minorUnits: 2 },
   { code: 'AED', symbol: 'AED', label: 'UAE Dirham (AED)', minorUnits: 2 },
+  { code: 'SAR', symbol: 'SAR', label: 'Saudi Riyal (SAR)', minorUnits: 2 },
   { code: 'EUR', symbol: '€', label: 'Euro (EUR)', minorUnits: 2 },
   { code: 'GBP', symbol: '£', label: 'British Pound (GBP)', minorUnits: 2 },
 ];

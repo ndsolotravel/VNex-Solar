@@ -3,6 +3,8 @@ package com.vnexsolar.app.feature.safety
 import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.vnexsolar.app.core.preferences.AppPreferences
+import com.vnexsolar.app.core.security.SessionVault
 import com.vnexsolar.app.core.sync.NetworkMonitor
 import com.vnexsolar.app.core.sync.OfflineRepository
 import com.vnexsolar.app.core.sync.SyncWorker
@@ -69,6 +71,8 @@ data class SafetyInspectionUiState(
 class SafetyInspectionViewModel @Inject constructor(
     @ApplicationContext private val appContext: Context,
     private val offlineRepository: OfflineRepository,
+    private val sessionVault: SessionVault,
+    private val appPreferences: AppPreferences,
     networkMonitor: NetworkMonitor,
 ) : ViewModel() {
 
@@ -119,9 +123,14 @@ class SafetyInspectionViewModel @Inject constructor(
         jpegBytes: ByteArray,
     ) {
         val inspectionId = _uiState.value.inspectionId
+        val resolvedOrg = if (organizationId == "local-org" || organizationId.isBlank()) {
+            sessionVault.currentSession?.organizationId ?: organizationId
+        } else {
+            organizationId
+        }
         viewModelScope.launch {
             offlineRepository.enqueueMediaAttachment(
-                organizationId = organizationId,
+                organizationId = resolvedOrg,
                 entityType = "inspection_draft",
                 entityId = inspectionId,
                 localFilePath = localFilePath,
@@ -142,6 +151,11 @@ class SafetyInspectionViewModel @Inject constructor(
         val earthVal = state.earthResistanceOhms.toDoubleOrNull() ?: 99.0
         val insVal = state.insulationResistanceMOhm.toDoubleOrNull() ?: 0.0
         val rcdVal = state.rcdTripTimeMs.toDoubleOrNull() ?: 40.0
+        val resolvedOrg = if (organizationId == "local-org" || organizationId.isBlank()) {
+            sessionVault.currentSession?.organizationId ?: organizationId
+        } else {
+            organizationId
+        }
 
         val payload = InspectionDraftSyncPayload(
             installationJobId = state.installationJobId,
@@ -172,15 +186,20 @@ class SafetyInspectionViewModel @Inject constructor(
         )
 
         viewModelScope.launch {
+            val resolvedDevice = if (deviceId == "android-field-device" || deviceId.isBlank()) {
+                runCatching { appPreferences.getOrCreateDeviceId() }.getOrElse { deviceId }
+            } else {
+                deviceId
+            }
             offlineRepository.enqueueEntityOutboxMutation(
-                organizationId = organizationId,
+                organizationId = resolvedOrg,
                 entityType = "inspection_draft",
                 entityId = state.inspectionId,
                 operationType = "create",
                 baseRowVersion = 0,
                 payloadJson = Json.encodeToString(payload),
             )
-            SyncWorker.enqueueOneTime(appContext, organizationId, deviceId)
+            SyncWorker.enqueueOneTime(appContext, resolvedOrg, resolvedDevice)
             _uiState.update {
                 it.copy(
                     statusMessage =

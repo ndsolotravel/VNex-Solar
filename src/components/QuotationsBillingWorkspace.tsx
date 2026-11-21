@@ -1233,11 +1233,13 @@ export function QuotationsBillingWorkspace({
                     onChange={(e) => setPayMethod(e.target.value as PaymentMethod)}
                     className="mt-1 w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 px-2.5 py-2 text-xs"
                   >
-                    <option value="bank_transfer">bank_transfer</option>
-                    <option value="cash">cash</option>
-                    <option value="cheque">cheque</option>
-                    <option value="card">card</option>
-                    <option value="online">online</option>
+                    <option value="bank_transfer">Bank Transfer</option>
+                    <option value="cash">Cash</option>
+                    <option value="jazzcash">JazzCash</option>
+                    <option value="easypaisa">Easypaisa</option>
+                    <option value="cheque">Cheque</option>
+                    <option value="card">Card</option>
+                    <option value="online">Online Transfer</option>
                   </select>
                 </label>
                 <label className="block text-xs font-medium text-slate-700 dark:text-slate-300">

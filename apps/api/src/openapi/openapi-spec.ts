@@ -1173,5 +1173,13 @@ export const VNEX_OPENAPI_SPEC = {
         responses: { '200': { description: 'Media recovery queue' } },
       },
     },
+    '/dashboard/summary': {
+      get: {
+        summary: 'Get real-time tenant KPI summary and 6-month revenue/expense series with date range filter',
+        tags: ['Reporting & Dashboard'],
+        security: [{ bearerAuth: [] }],
+        responses: { '200': { description: 'Dashboard KPI summary and monthly series' } },
+      },
+    },
   },
 } as const;
